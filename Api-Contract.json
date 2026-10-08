@@ -1,0 +1,303 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Collaborative Notes API",
+    "version": "1.1.0",
+    "description": "API разделено на модули: Авторизация, Приватное управление заметками (по ID) и Публичный доступ (по токену)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080/api/v1"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Авторизация и регистрация пользователей"
+    },
+    {
+      "name": "Notes",
+      "description": "Управление своими заметками (только для создателя/редакторов по UUID)"
+    },
+    {
+      "name": "Shared",
+      "description": "Доступ к чужим заметкам по share-токену"
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Регистрация нового пользователя",
+        "operationId": "registerUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuthRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Пользователь создан" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Вход в систему",
+        "operationId": "loginUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AuthRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Успешная авторизация",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JwtResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes": {
+      "post": {
+        "tags": ["Notes"],
+        "summary": "Создать новую заметку",
+        "security": [{ "BearerAuth": [] }],
+        "operationId": "createNote",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NoteCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Заметка создана",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Note" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/{id}": {
+      "get": {
+        "tags": ["Notes"],
+        "summary": "Получить свою заметку по ID",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Note" }
+              }
+            }
+          },
+          "403": { "description": "Доступ запрещен (не владелец)" }
+        }
+      },
+      "patch": {
+        "tags": ["Notes"],
+        "summary": "Обновить свою заметку (генерирует diff)",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NoteUpdateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Успешно обновлено" },
+          "403": { "description": "Доступ запрещен" },
+          "409": { "description": "Конфликт версий (Optimistic Locking)" }
+        }
+      }
+    },
+    "/notes/{id}/tokens": {
+      "post": {
+        "tags": ["Notes"],
+        "summary": "Сгенерировать share-токен для заметки",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TokenCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Токен создан",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Token" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/shared/{token}": {
+      "get": {
+        "tags": ["Shared"],
+        "summary": "Получить чужую заметку по токену",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "description": "Сгенерированный share-токен",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Заметка получена",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Note" }
+              }
+            }
+          },
+          "401": { "description": "Токен недействителен или просрочен" }
+        }
+      },
+      "patch": {
+        "tags": ["Shared"],
+        "summary": "Редактировать чужую заметку по токену",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NoteUpdateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Успешно обновлено" },
+          "403": { "description": "Токен дает право только на чтение, запись запрещена" },
+          "409": { "description": "Конфликт версий" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "AuthRequest": {
+        "type": "object",
+        "required": ["login", "password"],
+        "properties": {
+          "login": { "type": "string" },
+          "password": { "type": "string", "format": "password" }
+        }
+      },
+      "JwtResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": { "type": "string" }
+        }
+      },
+      "Note": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "markdown": { "type": "string" },
+          "revision": { "type": "integer", "format": "int64" }
+        }
+      },
+      "NoteCreateRequest": {
+        "type": "object",
+        "required": ["title", "markdown"],
+        "properties": {
+          "title": { "type": "string" },
+          "markdown": { "type": "string" }
+        }
+      },
+      "NoteUpdateRequest": {
+        "type": "object",
+        "required": ["revision"],
+        "properties": {
+          "title": { "type": "string" },
+          "markdown": { "type": "string" },
+          "revision": { "type": "integer", "format": "int64" }
+        }
+      },
+      "TokenCreateRequest": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["READ", "WRITE", "COMMENT"]
+          },
+          "expiresInMinutes": { "type": "integer", "nullable": true }
+        }
+      },
+      "Token": {
+        "type": "object",
+        "properties": {
+          "tokenDigest": { "type": "string" },
+          "type": { "type": "string", "enum": ["READ", "WRITE", "COMMENT"] }
+        }
+      }
+    }
+  }
+}
