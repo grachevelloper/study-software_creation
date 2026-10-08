@@ -309,33 +309,34 @@ erDiagram
         TIMESTAMP updated_at
     }
 
-    SESSIONS {
+    TOKENS {
         UUID id PK
-        UUID user_id FK
+        ACCESS_TYPE type
+        UUID note_id
         STRING token_digest UK
         TIMESTAMP expires_at
         TIMESTAMP revoked_at
     }
 
+
     NOTES {
         UUID id PK
-        UUID owner_user_id
+        UUID owner_user_id FK
         VARCHAR title
         TEXT markdown
         BIGINT revision
-        UUID updated_by_user_id
+        UUID updated_by_user_id FK
         TIMESTAMP expired_at
-        TIMESTAMP session_started_at
         TIMESTAMP last_edited_at
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
 
     NOTE_EDITORS {
-        UUID note_id FK
-        UUID user_id
+
+        UUID note_id PK, FK
+        UUID user_id PK, FK
         TIMESTAMP granted_at
-        UUID granted_by_user_id
     }
 
     NOTE_VERSIONS {
@@ -343,13 +344,15 @@ erDiagram
         UUID note_id FK
         INT number
         VARCHAR title
-        TEXT markdown
+        JSONB markdown_diff
         STRING source
-        UUID created_by_user_id
+        UUID created_by_user_id FK
         TIMESTAMP created_at
     }
-
-    USERS ||--o{ SESSIONS : "имеет"
+    
+    USERS ||--o{ NOTES : "имеет"
+    USERS ||--o{ NOTE_EDITORS : "могут быть"
+    NOTES ||--o{ TOKENS : "доступ по токену"
     NOTES ||--o{ NOTE_EDITORS : "доступ редакторов"
     NOTES ||--o{ NOTE_VERSIONS : "имеет версии"
 ```
