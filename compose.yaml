@@ -22,6 +22,7 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
+    user: "101:101"
     depends_on:
       app:
         condition: service_healthy
@@ -32,8 +33,8 @@ services:
     restart: unless-stopped
     read_only: true
     tmpfs:
-      - /var/cache/nginx
-      - /var/run
+      - /var/cache/nginx:uid=101,gid=101
+      - /var/run:uid=101,gid=101
       - /tmp
     security_opt:
       - no-new-privileges:true
@@ -43,10 +44,12 @@ services:
       - NET_BIND_SERVICE
     networks:
       - backend
+      - frontend
 
 volumes:
   notes_data:
 
 networks:
+  frontend: {}
   backend:
     internal: true
