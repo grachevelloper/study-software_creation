@@ -1,33 +1,52 @@
-coname: markdown-notes-local
-
 services:
-  web:
-    image: nginx:alpine
-    user: "101:101"
-    ports:
-      - "127.0.0.1:8080:8080"
+  app:
+    build:
+      context: .
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-before-public-deployment}
+      ACCESS_TTL_SECONDS: 900
+      REFRESH_TTL_SECONDS: 604800
+      DATABASE_PATH: /data/notes.db
     volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-      - site-data:/usr/share/nginx/html
+      - notes_data:/data
+    restart: unless-stopped
     read_only: true
     tmpfs:
-      - /tmp:uid=101,gid=101,mode=1777
-    cap_drop:
-      - ALL
+      - /tmp
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
-      interval: 15s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-    logging:
-      driver: json-file
-      options:
-        max-size: "5m"
-        max-file: "3"
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    networks:
+      - backend
 
 volumes:
-  site-data:
+  notes_data:
+
+networks:
+  backend:
+    internal: true

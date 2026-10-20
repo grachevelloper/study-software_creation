@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Markdown Notes</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Учебный стенд</p>
+        <h1>Markdown Notes</h1>
+        <p>Создавайте заметки и делитесь ссылкой только для чтения или редактирования.</p>
+      </div>
+      <span id="status">Не авторизован</span>
+    </header>
+
+    <section class="grid">
+      <form id="auth-form" class="panel">
+        <h2>Вход и регистрация</h2>
+        <label>Логин <input id="login" value="student" autocomplete="username" required></label>
+        <label>Пароль <input id="password" value="password123" type="password" autocomplete="current-password" required></label>
+        <div class="actions">
+          <button type="submit">Войти</button>
+          <button type="button" id="register" class="secondary">Регистрация</button>
+        </div>
+      </form>
+
+      <form id="note-form" class="panel">
+        <h2>Новая заметка</h2>
+        <label>Название <input id="title" value="Первая заметка" required></label>
+        <label>Срок жизни
+          <select id="lifetime"><option>7</option><option selected>30</option><option>90</option></select>
+        </label>
+        <label>Markdown <textarea id="markdown" rows="8"># Привет\n\nЭто **Markdown Notes**.</textarea></label>
+        <button type="submit">Создать заметку</button>
+      </form>
+    </section>
+
+    <section class="panel" id="result-panel">
+      <h2>Результат</h2>
+      <pre id="result">Сначала зарегистрируйтесь или войдите.</pre>
+      <div id="share-actions" class="actions hidden">
+        <button type="button" data-kind="READ">Ссылка для чтения</button>
+        <button type="button" data-kind="WRITE" class="secondary">Ссылка для редактирования</button>
+      </div>
+      <p id="share-link"></p>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

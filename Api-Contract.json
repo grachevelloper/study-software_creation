@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Collaborative Notes API",
-    "version": "1.1.0",
-    "description": "API разделено на модули: Авторизация, Приватное управление заметками (по ID) и Публичный доступ (по токену)."
+    "version": "1.2.0",
+    "description": "API разделено на модули: авторизация, управление заметками по идентификатору и публичный доступ по share-токену."
   },
   "servers": [
     {
@@ -39,7 +39,14 @@
           }
         },
         "responses": {
-          "201": { "description": "Пользователь создан" }
+          "201": {
+            "description": "Пользователь создан",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserResponse" }
+              }
+            }
+          }
         }
       }
     },
@@ -65,6 +72,50 @@
               }
             }
           }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Обновить пользовательскую сессию",
+        "operationId": "refreshSession",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RefreshTokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Сессия обновлена, прежний refresh-токен отозван",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JwtResponse" }
+              }
+            }
+          },
+          "401": { "description": "Refresh-токен недействителен или просрочен" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Завершить пользовательскую сессию",
+        "operationId": "logoutUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RefreshTokenRequest" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Сессия завершена" }
         }
       }
     },
@@ -248,34 +299,79 @@
           "password": { "type": "string", "format": "password" }
         }
       },
+      "UserResponse": {
+        "type": "object",
+        "required": ["id", "login", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "login": { "type": "string" },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Время создания пользователя в UTC, устанавливаемое сервером"
+          }
+        }
+      },
       "JwtResponse": {
         "type": "object",
+        "required": ["accessToken", "refreshToken", "expiresAt"],
         "properties": {
-          "accessToken": { "type": "string" }
+          "accessToken": { "type": "string" },
+          "refreshToken": { "type": "string" },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Время истечения access-токена в UTC"
+          }
+        }
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "required": ["refreshToken"],
+        "properties": {
+          "refreshToken": { "type": "string" }
         }
       },
       "Note": {
         "type": "object",
+        "required": ["id", "title", "markdown", "revision", "createdAt", "updatedAt", "expiredAt"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "title": { "type": "string" },
+          "title": {
+            "type": "string",
+            "description": "Краткое название заметки для отображения в списке и заголовке страницы"
+          },
           "markdown": { "type": "string" },
-          "revision": { "type": "integer", "format": "int64" }
+          "revision": { "type": "integer", "format": "int64" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "expiredAt": { "type": "string", "format": "date-time" }
         }
       },
       "NoteCreateRequest": {
         "type": "object",
-        "required": ["title", "markdown"],
+        "required": ["title", "markdown", "lifetimeDays"],
         "properties": {
-          "title": { "type": "string" },
-          "markdown": { "type": "string" }
+          "title": {
+            "type": "string",
+            "description": "Краткое название заметки для отображения в списке и заголовке страницы"
+          },
+          "markdown": { "type": "string", "maxLength": 1048576 },
+          "lifetimeDays": {
+            "type": "integer",
+            "enum": [7, 30, 90],
+            "description": "Срок жизни заметки; expiredAt вычисляется сервером"
+          }
         }
       },
       "NoteUpdateRequest": {
         "type": "object",
         "required": ["revision"],
         "properties": {
-          "title": { "type": "string" },
+          "title": {
+            "type": "string",
+            "description": "Новое название заметки; поле передается только при его изменении"
+          },
           "markdown": { "type": "string" },
           "revision": { "type": "integer", "format": "int64" }
         }
@@ -286,16 +382,31 @@
         "properties": {
           "type": {
             "type": "string",
-            "enum": ["READ", "WRITE", "COMMENT"]
+            "enum": ["READ", "WRITE"],
+            "description": "READ разрешает только чтение; WRITE разрешает чтение и изменение заметки"
           },
           "expiresInMinutes": { "type": "integer", "nullable": true }
         }
       },
       "Token": {
         "type": "object",
+        "required": ["token", "type"],
         "properties": {
-          "tokenDigest": { "type": "string" },
-          "type": { "type": "string", "enum": ["READ", "WRITE", "COMMENT"] }
+          "token": {
+            "type": "string",
+            "description": "Share-токен, возвращаемый только при создании; на сервере хранится его хэш"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["READ", "WRITE"],
+            "description": "READ разрешает только чтение; WRITE разрешает чтение и изменение заметки"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Время истечения токена в UTC; null означает отсутствие срока"
+          }
         }
       }
     }
